@@ -47,6 +47,7 @@ const vendorIcons = {
   siemens: "⚡",
   abb: "🏭", 
   johnson_controls: "🏢",
+  loytec: "🌐",
   file: "📁",
   custom: "⚙️"
 };
@@ -56,6 +57,7 @@ const vendorColors = {
   siemens: "bg-blue-100 text-blue-800",
   abb: "bg-orange-100 text-orange-800",
   johnson_controls: "bg-purple-100 text-purple-800",
+  loytec: "bg-red-100 text-red-800",
   file: "bg-gray-100 text-gray-800",
   custom: "bg-indigo-100 text-indigo-800"
 };

@@ -15,6 +15,7 @@ import PredictiveAnalysis from "@/pages/PredictiveAnalysis";
 import BACnetDiscovery from "@/pages/BACnetDiscovery";
 import ModbusScanner from "@/pages/ModbusScanner";
 import ModbusEnergyDiscovery from "@/pages/ModbusEnergyDiscovery";
+import MeterDiscovery from "@/pages/MeterDiscovery";
 import { BMSManagement } from "@/pages/BMSManagement";
 import { UserManagement } from "@/pages/UserManagement";
 import { Sidebar } from "@/components/Sidebar";
@@ -84,6 +85,9 @@ function Router() {
       </Route>
       <Route path="/meters">
         <ProtectedRoute component={Meters} allowedRoles={["admin", "operator"]} />
+      </Route>
+      <Route path="/meter-discovery">
+        <ProtectedRoute component={MeterDiscovery} allowedRoles={["admin"]} />
       </Route>
       <Route path="/analytics">
         <ProtectedRoute component={Analytics} />

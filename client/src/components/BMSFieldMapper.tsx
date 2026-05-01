@@ -173,6 +173,11 @@ export function BMSFieldMapper({ connection, onSave }: BMSFieldMapperProps) {
     description?: string,
     subFields?: { [key: string]: string }
   ) => {
+    // Ensure section exists in mappings
+    if (!mappings[section]) {
+      return null;
+    }
+
     if (subFields) {
       return (
         <div key={field} className="space-y-3">

@@ -9,3 +9,7 @@ vite.config.ts.*
 *.zip
 server-log.txt
 exported-data/
+*.bak
+app-startup.log
+trend-log-results.txt
+server/trend-log-methods.ts.txt

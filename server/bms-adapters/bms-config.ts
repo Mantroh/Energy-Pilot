@@ -3,7 +3,7 @@
 export interface BMSConnectionConfig {
   id: string;
   name: string;
-  vendor: 'schneider' | 'siemens' | 'abb' | 'johnson_controls' | 'file' | 'custom';
+  vendor: 'schneider' | 'siemens' | 'abb' | 'johnson_controls' | 'file' | 'custom' | 'loytec';
   
   // Database connection
   database?: {
@@ -139,10 +139,13 @@ function createLegacyConfig(): BMSConnectionConfig | null {
     return null;
   }
   
+  // Detect vendor from BMS_VENDOR environment variable, default to loytec
+  const vendor = (process.env.BMS_VENDOR || 'loytec') as 'schneider' | 'siemens' | 'loytec' | 'abb' | 'johnson_controls' | 'file' | 'custom';
+  
   return {
     id: 'legacy-bms',
-    name: 'Legacy BMS Connection',
-    vendor: 'schneider',
+    name: `BMS Connection (${vendor.toUpperCase()})`,
+    vendor: vendor,
     database: {
       server: process.env.BMS_SERVER,
       database: process.env.BMS_DATABASE,
@@ -155,7 +158,7 @@ function createLegacyConfig(): BMSConnectionConfig | null {
     },
     sync: {
       enableRealtime: true,
-      intervalMinutes: parseInt(process.env.BMS_SYNC_INTERVAL || '5')
+      intervalMinutes: parseInt(process.env.BMS_SYNC_INTERVAL || '2')
     }
   };
 }

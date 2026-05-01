@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, doublePrecision, jsonb, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, doublePrecision, jsonb, varchar, bigint } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { sql } from "drizzle-orm";
@@ -162,6 +162,63 @@ export const bacnetObjectMappings = pgTable("bacnet_object_mappings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// === Trend Log Tables (from BMS exported data) ===
+
+// Stores trend log metadata from LogInfo.csv
+export const trendLogs = pgTable("trend_logs", {
+  id: serial("id").primaryKey(),
+  logId: integer("log_id").notNull().unique(), // Unique ID from BMS
+  logType: integer("log_type").notNull(), // 1=Datapoint Log, 2=Alarm Log, 3=EventLog, 4=TrendLog
+  sourceId: integer("source_id"), // DDC device ID
+  sourceName: text("source_name"), // 'DDC24', 'LWEB-900 Server'
+  absolutePath: text("absolute_path"), // 'System/Trending/Trend AHU_43_RAT'
+  tableName: text("table_name").notNull(), // 'TrendLog_00000001', 'TrendLog_00000008'
+  
+  // Record counts and timestamps
+  sourceRecordCount: integer("source_record_count"), // Total records in source
+  serverRecordCount: integer("server_record_count"), // Records on server
+  firstTimestamp: bigint("first_timestamp", { mode: "number" }), // Unix timestamp
+  lastTimestamp: bigint("last_timestamp", { mode: "number" }), // Unix timestamp
+  
+  // Status
+  isActive: boolean("is_active").default(true),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Stores individual parameter definitions from LogItemInfo.csv
+export const trendLogItems = pgTable("trend_log_items", {
+  id: serial("id").primaryKey(),
+  logId: integer("log_id").notNull().references(() => trendLogs.logId), // Reference to trend log
+  itemId: integer("item_id"), // BMS internal item ID
+  itemIndex: integer("item_index").notNull(), // Index within the trend log (0, 1, 2, ...)
+  absolutePath: text("absolute_path"), // 'Datapoints/Trend/Trend_KWH', 'Datapoints/Trend/2F_AHU_RAT'
+  unit: text("unit"), // 'kWh', 'kW', 'A', 'V', 'Hz', etc.
+  aggregationMode: integer("aggregation_mode"), // 0, 1, 2, etc.
+  compression: text("compression"), // Compression method if any
+  
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Links meters to their corresponding trend logs
+export const meterTrendMappings = pgTable("meter_trend_mappings", {
+  id: serial("id").primaryKey(),
+  deviceId: integer("device_id").notNull().references(() => devices.id),
+  trendLogId: integer("trend_log_id").notNull().references(() => trendLogs.logId),
+  
+  // Friendly name for the trend log (e.g., "KWh Daily", "Power Analysis")
+  friendlyName: text("friendly_name"),
+  
+  // Which parameters to track for this meter (CSV: 'power,voltage,current,energy,frequency')
+  trackedParameters: text("tracked_parameters"),
+  
+  isActive: boolean("is_active").default(true),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // === SCHEMAS ===
 
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
@@ -175,6 +232,11 @@ export const insertBacnetControllerSchema = createInsertSchema(bacnetControllers
 export const insertModbusDeviceSchema = createInsertSchema(modbusDevices).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertModbusRegisterMapSchema = createInsertSchema(modbusRegisterMaps).omit({ id: true, createdAt: true });
 export const insertBacnetObjectMappingSchema = createInsertSchema(bacnetObjectMappings).omit({ id: true, createdAt: true, updatedAt: true });
+
+// Trend Log schemas
+export const insertTrendLogSchema = createInsertSchema(trendLogs).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertTrendLogItemSchema = createInsertSchema(trendLogItems).omit({ id: true, createdAt: true });
+export const insertMeterTrendMappingSchema = createInsertSchema(meterTrendMappings).omit({ id: true, createdAt: true, updatedAt: true });
 
 // === TYPES ===
 
@@ -205,6 +267,16 @@ export type InsertModbusRegisterMap = z.infer<typeof insertModbusRegisterMapSche
 
 export type BacnetObjectMapping = typeof bacnetObjectMappings.$inferSelect;
 export type InsertBacnetObjectMapping = z.infer<typeof insertBacnetObjectMappingSchema>;
+
+// Trend Log types
+export type TrendLog = typeof trendLogs.$inferSelect;
+export type InsertTrendLog = z.infer<typeof insertTrendLogSchema>;
+
+export type TrendLogItem = typeof trendLogItems.$inferSelect;
+export type InsertTrendLogItem = z.infer<typeof insertTrendLogItemSchema>;
+
+export type MeterTrendMapping = typeof meterTrendMappings.$inferSelect;
+export type InsertMeterTrendMapping = z.infer<typeof insertMeterTrendMappingSchema>;
 
 // Request Types
 export type CreateDeviceRequest = InsertDevice;

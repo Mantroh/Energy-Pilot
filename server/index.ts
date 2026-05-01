@@ -189,13 +189,14 @@ app.use((req, res, next) => {
     
     // Generate historical data for analytics (30 days of readings)
     // This simulates past data since we just started collecting
-    if (meters.length > 0) {
+    // DISABLED: Only generate for real data collection, not mock mode
+    /* if (meters.length > 0) {
       log(`📊 Generating historical data for analytics...`, "BACnet");
       for (const device of meters) {
         await storage.generateHistoricalData(device.id, 30); // 30 days of history
       }
       log(`✅ Historical data generation complete`, "BACnet");
-    }
+    } */
     
     // Graceful shutdown
     const originalSigIntHandler = process.listeners('SIGINT')[0];

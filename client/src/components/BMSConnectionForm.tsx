@@ -19,6 +19,7 @@ const vendors = [
   { value: "siemens", label: "Siemens", description: "DESIGO, Navigator systems" },
   { value: "abb", label: "ABB", description: "Ability System 800xA, Symphony Plus" },
   { value: "johnson_controls", label: "Johnson Controls", description: "Metasys, FX series" },
+  { value: "loytec", label: "Loytec", description: "BACnet/IP, NXL-series systems" },
   { value: "file", label: "File-based", description: "CSV, Excel files" },
   { value: "custom", label: "Custom Database", description: "Generic SQL Server database" }
 ];
@@ -51,7 +52,7 @@ export function BMSConnectionForm({ initialData, onSubmit, onCancel }: BMSConnec
     if (!formData.server.trim()) newErrors.server = 'Server is required';
     if (!formData.database.trim()) newErrors.database = 'Database is required';
     if (!formData.username.trim()) newErrors.username = 'Username is required';
-    if (!initialData && !formData.password.trim()) newErrors.password = 'Password is required';
+    // Password is optional - some systems use Windows auth or other authentication methods
     
     if (formData.port < 1 || formData.port > 65535) {
       newErrors.port = 'Port must be between 1 and 65535';
@@ -210,8 +211,9 @@ export function BMSConnectionForm({ initialData, onSubmit, onCancel }: BMSConnec
 
             <div className="space-y-2">
               <Label htmlFor="password">
-                Password {!initialData && '*'}
+                Password
                 {initialData && <span className="text-sm text-gray-500">(leave blank to keep current)</span>}
+                {!initialData && <span className="text-sm text-gray-500">(optional)</span>}
               </Label>
               <div className="relative">
                 <Input
@@ -219,7 +221,7 @@ export function BMSConnectionForm({ initialData, onSubmit, onCancel }: BMSConnec
                   type={showPassword ? "text" : "password"}
                   value={formData.password}
                   onChange={(e) => updateFormData('password', e.target.value)}
-                  placeholder={initialData ? "••••••••" : "Enter password"}
+                  placeholder={initialData ? "••••••••" : "Leave blank for Windows auth"}
                 />
                 <Button
                   type="button"

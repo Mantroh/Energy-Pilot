@@ -4,14 +4,14 @@ import { z } from "zod";
 // BMS Connection Schema
 export const insertBMSConnectionSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  vendor: z.enum(["schneider", "siemens", "abb", "johnson_controls", "file", "custom"]),
+  vendor: z.enum(["schneider", "siemens", "abb", "johnson_controls", "file", "custom", "loytec"]),
   
   // Database connection details
   server: z.string().min(1, "Server is required"),
   port: z.number().int().positive().optional().default(1433),
   database: z.string().min(1, "Database name is required"),
   username: z.string().min(1, "Username is required"),
-  password: z.string(),
+  password: z.string().optional().default(""),
   
   // Connection options
   trustServerCertificate: z.boolean().default(true),

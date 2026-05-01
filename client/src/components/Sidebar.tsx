@@ -10,6 +10,7 @@ const navItems = [
   { name: "Dashboard", icon: LayoutDashboard, href: "/", roles: ["admin", "operator", "viewer"] },
   { name: "Devices", icon: Server, href: "/devices", roles: ["admin"] }, // Only admin
   { name: "Meters", icon: Zap, href: "/meters", roles: ["admin", "operator"] }, // Admin and operator
+  { name: "Meter Discovery", icon: Database, href: "/meter-discovery", roles: ["admin"] }, // Only admin
   { name: "BACnet Discovery", icon: Network, href: "/bacnet-discovery", roles: ["admin"] }, // Only admin
   { name: "Modbus Scanner", icon: Radio, href: "/modbus-scanner", roles: ["admin"] }, // Only admin
   { name: "Energy Meters", icon: Zap, href: "/modbus-energy-discovery", roles: ["admin"] }, // Only admin

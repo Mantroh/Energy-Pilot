@@ -2,13 +2,17 @@ import { db } from "./db";
 import {
   devices, readings, alerts, thresholds, users,
   bacnetControllers, bacnetObjectMappings,
+  trendLogs, trendLogItems, meterTrendMappings,
   type Device, type InsertDevice,
   type Reading, type InsertReading,
   type Alert, type InsertAlert,
   type Threshold, type InsertThreshold,
   type User, type InsertUser,
   type BacnetController, type InsertBacnetController,
-  type BacnetObjectMapping, type InsertBacnetObjectMapping
+  type BacnetObjectMapping, type InsertBacnetObjectMapping,
+  type TrendLog, type InsertTrendLog,
+  type TrendLogItem, type InsertTrendLogItem,
+  type MeterTrendMapping, type InsertMeterTrendMapping
 } from "@shared/schema";
 import type { BMSConnection, InsertBMSConnection, UpdateBMSConnection } from "../shared/bms-schema";
 import { insertBMSConnectionSchema, updateBMSConnectionSchema, defaultFieldMappings } from "../shared/bms-schema";
@@ -86,80 +90,31 @@ export interface IStorage {
   // BACnet Object Mappings
   createBacnetObjectMapping(mapping: InsertBacnetObjectMapping): Promise<BacnetObjectMapping>;
   getBacnetObjectMappingsByDevice(deviceId: number): Promise<BacnetObjectMapping[]>;
+
+  // Trend Logs
+  importTrendLogsFromCSV(): Promise<{ trendLogCount: number; itemCount: number; }>;
+  getTrendLogs(): Promise<any[]>;
+  getTrendLogItems(logId: number): Promise<any[]>;
+  linkMeterToTrendLog(deviceId: number, trendLogId: number, friendlyName?: string): Promise<any>;
+  getMeterTrendLogs(deviceId: number): Promise<any[]>;
 }
 
 // Mock storage for development mode (when no database is available)
 export class MockStorage implements IStorage {
   private mockDevices: Device[] = [
-    {
-      id: 1,
-      name: "EM-MAIN-INCOMER",
-      type: "Smart Meter",
-      location: "Main Electrical Room - Incomer",
-      ipAddress: "192.168.1.100",
-      status: "online",
-      isBillingMeter: true, // Main utility meter - used for cost calculation
-      lastSeen: new Date(),
-      config: null,
-      createdAt: new Date(),
-    },
-    {
-      id: 2,
-      name: "EM-HVAC-SYSTEM",
-      type: "Smart Meter",
-      location: "Mechanical Floor - HVAC",
-      ipAddress: "192.168.1.101",
-      status: "online",
-      isBillingMeter: false, // Sub-meter - monitoring only
-      lastSeen: new Date(),
-      config: null,
-      createdAt: new Date(),
-    },
-    {
-      id: 3,
-      name: "EM-LIGHTING-CIRCUIT",
-      type: "Smart Meter",
-      location: "Distribution Board - Lighting",
-      ipAddress: "192.168.1.102",
-      status: "online",
-      isBillingMeter: false, // Sub-meter - monitoring only
-      lastSeen: new Date(),
-      config: null,
-      createdAt: new Date(),
-    },
-    {
-      id: 4,
-      name: "EM-DATA-CENTER",
-      type: "Smart Meter",
-      location: "Server Room - UPS Output",
-      ipAddress: "192.168.1.103",
-      status: "online",
-      isBillingMeter: false, // Sub-meter - monitoring only
-      lastSeen: new Date(),
-      config: null,
-      createdAt: new Date(),
-    },
-    {
-      id: 5,
-      name: "EM-PRODUCTION-LINE",
-      type: "Smart Meter",
-      location: "Factory Floor - Production",
-      ipAddress: "192.168.1.104",
-      status: "online",
-      isBillingMeter: false, // Sub-meter - monitoring only
-      lastSeen: new Date(),
-      config: null,
-      createdAt: new Date(),
-    },
+    // DISABLED: All demo devices removed - using real METRO_BHAWAN BMS data instead
+    // Original demo meters were:
+    // EM-MAIN-INCOMER, EM-HVAC-SYSTEM, EM-LIGHTING-CIRCUIT, EM-DATA-CENTER, EM-PRODUCTION-LINE
   ];
-  // Note: Real devices will be populated from BACnet discovery
+  // Note: Real devices will be populated from BMS integration
 
   private mockReadings: Reading[] = [];
   // Note: Real readings will be collected from BACnet objects
 
   constructor() {
-    // Generate 7 days of historical data for demo meters
-    this.mockReadings = this.initializeDemoHistoricalData();
+    // DISABLED: Don't generate demo historical data - use real BMS data instead
+    // this.mockReadings = this.initializeDemoHistoricalData();
+    this.mockReadings = [];
 
     // Initialize demo alerts
     this.mockAlerts = [
@@ -1482,21 +1437,34 @@ export class MockStorage implements IStorage {
     }
 
     try {
-      // Simulate connection test
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Import bmsManager which has the actual live adapters
+      const { bmsManager } = await import('./bms-adapters/bms-manager');
       
-      // Update connection status
-      await this.updateBMSConnection(id, { 
-        connectionStatus: 'connected',
-        errorMessage: undefined,
-        lastSync: new Date()
-      });
+      console.log(`🔌 Testing connection to ${connection.server}:${connection.port || 1433}/${connection.database}`);
       
-      return { success: true, message: 'Connection successful' };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      // Get all meters from the adapter (this proves it's connected and working)
+      const meters = await bmsManager.getAllMeters();
       
-      // Update connection status
+      if (meters && meters.length >= 0) {
+        console.log(`✅ Connection test successful - found ${meters.length} meters`);
+        
+        // Update connection status to connected
+        await this.updateBMSConnection(id, { 
+          connectionStatus: 'connected',
+          errorMessage: undefined,
+          lastSync: new Date()
+        });
+        
+        return { success: true, message: `Connection successful - found ${meters.length} meters` };
+      } else {
+        throw new Error('Unable to retrieve meters');
+      }
+    } catch (error: any) {
+      const errorMessage = error?.message || 'Unknown error';
+      
+      console.error(`❌ Connection test failed: ${errorMessage}`);
+      
+      // Update connection status to error
       await this.updateBMSConnection(id, { 
         connectionStatus: 'error',
         errorMessage

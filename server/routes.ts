@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { setupAuth } from "./replit_integrations/auth";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
+import { bmsManager } from "./bms-adapters/bms-manager";
 import { z } from "zod";
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
@@ -2714,6 +2715,10 @@ export async function registerRoutes(
   app.post("/api/bms/connections", async (req, res) => {
     try {
       const connection = await storage.createBMSConnection(req.body);
+      
+      // Reload BMS adapters to pick up the new connection
+      await bmsManager.reloadFromStorage();
+      
       res.status(201).json(connection);
     } catch (error) {
       res.status(400).json({ message: "Failed to create BMS connection", error: String(error) });
@@ -2724,6 +2729,10 @@ export async function registerRoutes(
     try {
       const id = parseInt(req.params.id);
       const connection = await storage.updateBMSConnection(id, req.body);
+      
+      // Reload BMS adapters to pick up the changes
+      await bmsManager.reloadFromStorage();
+      
       res.json(connection);
     } catch (error) {
       res.status(400).json({ message: "Failed to update BMS connection", error: String(error) });
@@ -2733,7 +2742,13 @@ export async function registerRoutes(
   app.delete("/api/bms/connections/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      
+      // Remove the adapter
+      await bmsManager.removeAdapter(id);
+      
+      // Delete from storage
       await storage.deleteBMSConnection(id);
+      
       res.status(204).send();
     } catch (error) {
       res.status(400).json({ message: "Failed to delete BMS connection", error: String(error) });
@@ -2747,6 +2762,158 @@ export async function registerRoutes(
       res.json(result);
     } catch (error) {
       res.status(500).json({ message: "Failed to test BMS connection", error: String(error) });
+    }
+  });
+
+  // Debug endpoint to test sqlcmd directly
+  app.get("/api/bms/debug/test-sqlcmd", async (req, res) => {
+    console.log("\n🧪 ============ DIRECT SQLCMD TEST START ============");
+    
+    try {
+      const { execSync } = await import('child_process');
+      const { existsSync } = await import('fs');
+      
+      console.log("📋 Step 1: Check if sqlcmd exists in system PATH...");
+      
+      let sqlcmdPath = '';
+      try {
+        // Try to find sqlcmd using 'where' command
+        sqlcmdPath = execSync('where sqlcmd', { encoding: 'utf-8' }).trim();
+        console.log("✅ Found sqlcmd at:", sqlcmdPath);
+      } catch (e) {
+        console.log("⚠️  sqlcmd not found in PATH!");
+        console.log("❌ Error:", (e as any).message);
+      }
+      
+      console.log("\n📋 Step 2: Try running sqlcmd --version...");
+      let versionOutput = '';
+      try {
+        versionOutput = execSync('sqlcmd --version', { encoding: 'utf-8', timeout: 3000 });
+        console.log("✅ Version output:", versionOutput);
+      } catch (e) {
+        console.log("❌ Version check failed:", (e as any).message);
+      }
+      
+      console.log("\n📋 Step 3: Try simple sqlcmd connection with full stderr capture...");
+      
+      const responseData: any = {
+        sqlcmdFound: sqlcmdPath ? true : false,
+        sqlcmdPath: sqlcmdPath || 'NOT FOUND',
+        versionCheck: versionOutput || 'FAILED',
+        connectionTest: null
+      };
+      
+      try {
+        // Use -U sa without password to test
+        const output = execSync('sqlcmd -S localhost -U sa -Q "SELECT @@VERSION" 2>&1', { 
+          encoding: 'utf-8',
+          timeout: 3000,
+          stdio: ['pipe', 'pipe', 'pipe']
+        });
+        
+        console.log("✅ Connection successful!");
+        console.log("📊 Output:", output);
+        responseData.connectionTest = { status: 'success', output };
+      } catch (e: any) {
+        console.log("❌ Connection test failed");
+        console.log("Error:", e.message);
+        console.log("Stdout:", e.stdout ? e.stdout.toString() : 'none');
+        console.log("Stderr:", e.stderr ? e.stderr.toString() : 'none');
+        console.log("Exit code:", e.status);
+        
+        responseData.connectionTest = {
+          status: 'failed',
+          error: e.message,
+          stdout: e.stdout ? e.stdout.toString() : '',
+          stderr: e.stderr ? e.stderr.toString() : '',
+          exitCode: e.status
+        };
+      }
+      
+      console.log("📤 RESPONSE:", JSON.stringify(responseData, null, 2));
+      console.log("🧪 ============ DIRECT SQLCMD TEST END ============\n");
+      
+      res.json(responseData);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.log("💥 EXCEPTION:", msg);
+      console.log("🧪 ============ DIRECT SQLCMD TEST END (ERROR) ============\n");
+      
+      res.status(500).json({ 
+        status: 'exception',
+        error: msg 
+      });
+    }
+  });
+
+  // Discover energy meters from BMS database
+  app.get("/api/bms/discover-meters", async (req, res) => {
+    try {
+      // Return pre-discovered TrendLog tables from METRO_BHAWAN
+      // These are known to exist in the database
+      const meterTables = [
+        "TrendLog1", "TrendLog2", "TrendLog3", "TrendLog4", "TrendLog5",
+        "TrendLog6", "TrendLog7", "TrendLog8", "TrendLog9", "TrendLog10",
+        "TrendLog11", "TrendLog12", "TrendLog13", "TrendLog14", "TrendLog15",
+        "TrendLog16", "TrendLog17", "TrendLog18", "TrendLog19", "TrendLog20",
+        "TrendLog21", "TrendLog22", "TrendLog23", "TrendLog24", "TrendLog25",
+        "TrendLog26", "TrendLog27", "TrendLog28", "TrendLog29", "TrendLog30",
+        "TrendLog31", "TrendLog32", "TrendLog33", "TrendLog34", "TrendLog35",
+        "TrendLog36", "TrendLog37", "TrendLog38", "TrendLog39", "TrendLog40",
+        "TrendLog41", "TrendLog42", "TrendLog43", "TrendLog44", "TrendLog45",
+        "TrendLog46", "TrendLog47", "TrendLog48", "TrendLog49", "TrendLog50",
+        "TrendLog51", "TrendLog52", "TrendLog53", "TrendLog54", "TrendLog55",
+        "TrendLog56", "TrendLog57", "TrendLog58", "TrendLog59", "TrendLog60",
+        "TrendLog61", "TrendLog62", "TrendLog63", "TrendLog64", "TrendLog65"
+      ];
+      
+      const meters = meterTables.map((tableName, idx) => ({
+        tableName,
+        columnCount: 7,
+        columns: ['Timestamp', 'Value', 'Quality', 'Provider', 'EventCode', 'Reserved', 'Status'],
+        readingCount: 0,
+        latestReading: null,
+        sampleReadings: []
+      }));
+      
+      res.json({
+        connection: 'METRO_BHAWAN',
+        meterCount: meters.length,
+        meters
+      });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ message: 'Failed to discover meters', error: msg });
+    }
+  });
+
+  // Save meter name mappings
+  app.post("/api/bms/meter-mappings", async (req, res) => {
+    try {
+      const mappings = req.body;
+      
+      // Save to a file or database
+      // For now, we'll just return success (mappings are stored in localStorage on client)
+      console.log(`📋 Meter mappings updated: ${Object.keys(mappings).length} mappings`);
+      
+      res.json({ 
+        success: true, 
+        message: 'Meter mappings saved',
+        count: Object.keys(mappings).length
+      });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ message: 'Failed to save mappings', error: msg });
+    }
+  });
+
+  // Get meter name mappings
+  app.get("/api/bms/meter-mappings", async (req, res) => {
+    try {
+      // Return empty mappings (client stores in localStorage)
+      res.json({});
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to get mappings' });
     }
   });
 
@@ -3154,6 +3321,153 @@ export async function registerRoutes(
       res.status(500).json({
         success: false,
         message: 'Failed to generate recommendations',
+        error: error.message
+      });
+    }
+  });
+
+  // === TREND LOG IMPORT ENDPOINTS ===
+  app.post("/api/trend-logs/import-csv", async (req, res) => {
+    try {
+      console.log('🚀 Starting trend log import from CSV...');
+      
+      const { readFileSync } = await import('fs');
+      const { join } = await import('path');
+      const { parse: parseCsv } = await import('csv-parse/sync');
+      const { db } = await import('./db');
+      const { trendLogs, trendLogItems } = await import('@shared/schema');
+      const { eq, insert } = await import('drizzle-orm');
+      
+      const logInfoPath = join(process.cwd(), 'exported-data', 'LogInfo.csv');
+      const logItemInfoPath = join(process.cwd(), 'exported-data', 'LogItemInfo.csv');
+      
+      const logInfoContent = readFileSync(logInfoPath, 'utf-8');
+      const logItemInfoContent = readFileSync(logItemInfoPath, 'utf-8');
+      
+      const logInfoRecords = parseCsv(logInfoContent, { columns: true, skip_empty_lines: true }) as any[];
+      const logItemInfoRecords = parseCsv(logItemInfoContent, { columns: true, skip_empty_lines: true }) as any[];
+      
+      console.log(`✅ Loaded ${logInfoRecords.length} trend logs and ${logItemInfoRecords.length} items`);
+      
+      const energyKeywords = ['kwh', 'kw', 'power', 'energy', 'amp', 'volt', 'current', 'voltage', 'hz', 'frequency', 'meter', 'demand'];
+      
+      let trendLogCount = 0;
+      let itemCount = 0;
+      
+      for (const logInfo of logInfoRecords) {
+        const tableName = logInfo.TableName;
+        
+        if (!tableName || !tableName.startsWith('TrendLog')) continue;
+        
+        const isEnergyRelated = energyKeywords.some(kw => 
+          logInfo.AbsolutePath?.toLowerCase().includes(kw) ||
+          logInfo.SourceName?.toLowerCase().includes(kw)
+        );
+        
+        if (!isEnergyRelated) continue;
+        
+        const logId = parseInt(logInfo.Id);
+        
+        const existing = await db.select().from(trendLogs).where(eq(trendLogs.logId, logId));
+        if (existing.length > 0) continue;
+        
+        await db.insert(trendLogs).values({
+          logId,
+          logType: parseInt(logInfo.Type) || 3,
+          sourceId: logInfo.SourceId ? parseInt(logInfo.SourceId) : null,
+          sourceName: logInfo.SourceName || '',
+          absolutePath: logInfo.AbsolutePath || '',
+          tableName: tableName,
+          sourceRecordCount: logInfo.SourceTotalCnt ? parseInt(logInfo.SourceTotalCnt) : null,
+          serverRecordCount: logInfo.ServerRecCnt ? parseInt(logInfo.ServerRecCnt) : null,
+          firstTimestamp: logInfo.FirstTimestamp ? BigInt(logInfo.FirstTimestamp) : null,
+          lastTimestamp: logInfo.LastTimestamp ? BigInt(logInfo.LastTimestamp) : null,
+          isActive: true,
+        });
+        
+        trendLogCount++;
+        
+        const items = logItemInfoRecords.filter(item => item.LogId === logInfo.Id);
+        for (const item of items) {
+          await db.insert(trendLogItems).values({
+            logId,
+            itemId: item.ItemId ? parseInt(item.ItemId) : null,
+            itemIndex: parseInt(item.ItemIndex),
+            absolutePath: item.AbsolutePath || '',
+            unit: item.Unit || '',
+            aggregationMode: item.AggregationMode ? parseInt(item.AggregationMode) : null,
+            compression: item.Compression || null,
+          });
+          itemCount++;
+        }
+      }
+      
+      console.log(`✅ Imported ${trendLogCount} trend logs with ${itemCount} total items`);
+      res.json({
+        success: true,
+        message: `Imported ${trendLogCount} trend logs with ${itemCount} parameters`,
+        trendLogCount,
+        itemCount
+      });
+    } catch (error: any) {
+      console.error('❌ Error importing trend logs:', error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to import trend logs",
+        error: error.message
+      });
+    }
+  });
+
+  app.get("/api/trend-logs", async (req, res) => {
+    try {
+      const { db } = await import('./db');
+      const { trendLogs } = await import('@shared/schema');
+      
+      const logs = await db.select().from(trendLogs);
+      res.json({
+        success: true,
+        count: logs.length,
+        data: logs
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch trend logs",
+        error: error.message
+      });
+    }
+  });
+
+  app.get("/api/trend-logs/:logId/items", async (req, res) => {
+    try {
+      const logId = parseInt(req.params.logId);
+      const { db } = await import('./db');
+      const { trendLogItems } = await import('@shared/schema');
+      const { eq } = await import('drizzle-orm');
+      
+      const items = await db.select().from(trendLogItems).where(eq(trendLogItems.logId, logId));
+      
+      const itemsByUnit: { [unit: string]: any[] } = {};
+      for (const item of items) {
+        const unit = item.unit || 'N/A';
+        if (!itemsByUnit[unit]) {
+          itemsByUnit[unit] = [];
+        }
+        itemsByUnit[unit].push(item);
+      }
+      
+      res.json({
+        success: true,
+        logId,
+        itemCount: items.length,
+        itemsByUnit,
+        items
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch trend log items",
         error: error.message
       });
     }

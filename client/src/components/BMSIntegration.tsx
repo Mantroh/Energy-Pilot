@@ -294,13 +294,13 @@ export function BMSIntegration() {
                 </CardHeader>
                 <CardContent className="pt-0">
                   <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div><strong>Power:</strong> {reading.parameters.activePower.toFixed(1)} kW</div>
-                    <div><strong>Energy:</strong> {reading.parameters.energy.toFixed(1)} kWh</div>
-                    <div><strong>Voltage L1:</strong> {reading.parameters.voltage.L1.toFixed(1)} V</div>
-                    <div><strong>Voltage L2:</strong> {reading.parameters.voltage.L2.toFixed(1)} V</div>
-                    <div><strong>Voltage L3:</strong> {reading.parameters.voltage.L3.toFixed(1)} V</div>
-                    <div><strong>Frequency:</strong> {reading.parameters.frequency.toFixed(1)} Hz</div>
-                    <div><strong>Power Factor:</strong> {reading.parameters.powerFactor.toFixed(2)}</div>
+                    <div><strong>Power:</strong> {(reading.parameters?.activePower ?? 0).toFixed(1)} kW</div>
+                    <div><strong>Energy:</strong> {(reading.parameters?.energy ?? 0).toFixed(1)} kWh</div>
+                    <div><strong>Voltage L1:</strong> {(reading.parameters?.voltage?.L1 ?? 0).toFixed(1)} V</div>
+                    <div><strong>Voltage L2:</strong> {(reading.parameters?.voltage?.L2 ?? 0).toFixed(1)} V</div>
+                    <div><strong>Voltage L3:</strong> {(reading.parameters?.voltage?.L3 ?? 0).toFixed(1)} V</div>
+                    <div><strong>Frequency:</strong> {(reading.parameters?.frequency ?? 50).toFixed(1)} Hz</div>
+                    <div><strong>Power Factor:</strong> {(reading.parameters?.powerFactor ?? 0).toFixed(2)}</div>
                   </div>
                 </CardContent>
               </Card>
